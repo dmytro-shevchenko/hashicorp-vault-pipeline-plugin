@@ -27,6 +27,8 @@ public class VaultReadStep extends Step {
     private String key;
     private String credentialsId;
     private String vaultUrl;
+    private Boolean renew;
+    private Integer renewHours;
 
     @DataBoundConstructor
     public VaultReadStep() {
@@ -53,18 +55,32 @@ public class VaultReadStep extends Step {
         this.vaultUrl = vaultUrl;
     }
 
+    @DataBoundSetter
+    public void setRenew(Boolean renew) {
+        this.renew = renew;
+    }
+
+    @DataBoundSetter
+    public void setRenewHours(Integer renewHours) {
+        this.renewHours = renewHours;
+    }
+
     @Override
     public StepExecution start(StepContext stepContext) throws Exception {
-        return new VaultStepExecution(this, stepContext);
+        return new VaultStepExecution(this, stepContext, this.renew, this.renewHours);
     }
 
     private static final class VaultStepExecution extends StepExecution {
         private static final long serialVersionUID = 1L;
         private transient final VaultReadStep step;
+        private Boolean renew;
+        private Integer renewHours;
 
-        private VaultStepExecution(VaultReadStep step, StepContext context) {
+        private VaultStepExecution(VaultReadStep step, StepContext context, Boolean renew, Integer renewHours) {
             super(context);
             this.step = step;
+            this.renew = renew;
+            this.renewHours = renewHours;
         }
 
         private EnvVars getEnvironment() throws Exception {
@@ -96,7 +112,11 @@ public class VaultReadStep extends Step {
         public boolean start() throws Exception {
             try {
                 EnvVars environment = getEnvironment();
-                String value = getAccessor(getContext().get(Run.class), getContext().get(TaskListener.class)).read(Util.replaceMacro(step.path, environment)).getData().get(Util.replaceMacro(step.key, environment));
+                VaultAccessor accessor = getAccessor(getContext().get(Run.class), getContext().get(TaskListener.class));
+                String value = accessor.read(Util.replaceMacro(step.path, environment)).getData().get(Util.replaceMacro(step.key, environment));
+                if (Boolean.TRUE.equals(this.renew)) {
+                    accessor.tokenRenew(this.renewHours);
+                }
                 getContext().onSuccess(value);
             } catch (VaultPluginException e) {
                 getContext().onFailure(e);

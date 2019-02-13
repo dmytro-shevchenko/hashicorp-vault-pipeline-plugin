@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.datapipe.jenkins.plugins</groupId>
+  <artifactId>hashicorp-vault-plugin</artifactId>
+  <versioning>
+    <release>2.2.1-NIBR</release>
+    <versions>
+      <version>2.2.1-NIBR</version>
+    </versions>
+    <lastUpdated>20190214155011</lastUpdated>
+  </versioning>
+</metadata>
