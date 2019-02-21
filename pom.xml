@@ -9,7 +9,7 @@
     </parent>
     <groupId>io.jenkins.plugins</groupId>
     <artifactId>hashicorp-vault-pipeline</artifactId>
-    <version>1.2-NIBR</version>
+    <version>1.2-NIBR-3</version>
     <packaging>hpi</packaging>
 
     <properties>
@@ -45,6 +45,22 @@
         <tag>hashicorp-vault-pipeline-1.2</tag>
     </scm>
 
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.jenkins-ci.tools</groupId>
+                    <artifactId>maven-hpi-plugin</artifactId>
+                    <extensions>true</extensions>
+                    <configuration>
+                        <compatibleSinceVersion>2.0.0</compatibleSinceVersion>
+                        <hpiName>${project.build.finalName}-${project.version}</hpiName>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
 
     <repositories>
         <repository>
@@ -67,12 +83,17 @@
         <dependency>
             <groupId>com.datapipe.jenkins.plugins</groupId>
             <artifactId>hashicorp-vault-plugin</artifactId>
-            <version>2.2.1-NIBR</version>
+            <version>2.2.1-NIBR-3</version>
         </dependency>
         <dependency>
             <groupId>org.jenkins-ci.plugins</groupId>
             <artifactId>credentials</artifactId>
             <version>2.1.18</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>credentials-binding</artifactId>
+            <version>1.18</version>
         </dependency>
         <dependency>
             <groupId>com.bettercloud</groupId>
@@ -93,6 +114,11 @@
             <groupId>org.jenkins-ci.plugins.workflow</groupId>
             <artifactId>workflow-cps</artifactId>
             <version>2.28</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins.workflow</groupId>
+            <artifactId>workflow-scm-step</artifactId>
+            <version>2.4</version>
         </dependency>
     </dependencies>
 </project>

@@ -3,8 +3,10 @@ package io.jenkins.plugins.vault;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.datapipe.jenkins.vault.VaultAccessor;
 import com.datapipe.jenkins.vault.configuration.GlobalVaultConfiguration;
+import com.datapipe.jenkins.vault.configuration.VaultConfiguration;
 import com.datapipe.jenkins.vault.credentials.VaultCredential;
 import com.datapipe.jenkins.vault.exception.VaultPluginException;
+import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Util;
@@ -29,6 +31,7 @@ public class VaultReadStep extends Step {
     private String vaultUrl;
     private Boolean renew;
     private Integer renewHours;
+    private Boolean printStacktrace;
 
     @DataBoundConstructor
     public VaultReadStep() {
@@ -65,22 +68,23 @@ public class VaultReadStep extends Step {
         this.renewHours = renewHours;
     }
 
+    @DataBoundSetter
+    public void setPrintStacktrace(Boolean printStacktrace) {
+        this.printStacktrace = printStacktrace;
+    }
+
     @Override
     public StepExecution start(StepContext stepContext) throws Exception {
-        return new VaultStepExecution(this, stepContext, this.renew, this.renewHours);
+        return new VaultStepExecution(this, stepContext);
     }
 
     private static final class VaultStepExecution extends StepExecution {
         private static final long serialVersionUID = 1L;
         private transient final VaultReadStep step;
-        private Boolean renew;
-        private Integer renewHours;
 
-        private VaultStepExecution(VaultReadStep step, StepContext context, Boolean renew, Integer renewHours) {
+        private VaultStepExecution(VaultReadStep step, StepContext context) {
             super(context);
             this.step = step;
-            this.renew = renew;
-            this.renewHours = renewHours;
         }
 
         private EnvVars getEnvironment() throws Exception {
@@ -95,31 +99,44 @@ public class VaultReadStep extends Step {
             String credentialsId = step.credentialsId == null || step.credentialsId.isEmpty() ? vaultConfig.getConfiguration().getVaultCredentialId() : Util.replaceMacro(step.credentialsId, environment);
             String vaultUrl = step.vaultUrl == null || step.vaultUrl.isEmpty() ? vaultConfig.getConfiguration().getVaultUrl() : Util.replaceMacro(step.vaultUrl, environment);
 
-            listener.getLogger().append(String.format("using vault credentials \"%s\" and url \"%s\"", credentialsId, vaultUrl));
+            // set default values for token renew if not provided
+            if (vaultConfig != null && vaultConfig.getConfiguration() != null) {
+                if (step.renew == null) {
+                    step.renew = vaultConfig.getConfiguration().getVaultRenew() != null ? vaultConfig.getConfiguration().getVaultRenew() : true;
+                }
+                if (step.renewHours == null) {
+                    step.renewHours = vaultConfig.getConfiguration().getVaultRenewHours() != null ? vaultConfig.getConfiguration().getVaultRenewHours() : 720;
+                }
+                if (step.printStacktrace == null) {
+                    step.printStacktrace = vaultConfig.getConfiguration().getPrintStacktrace() != null ? vaultConfig.getConfiguration().getPrintStacktrace() : false;
+                }
+            }
+
+            listener.getLogger().println(String.format("Using vault credentials \"%s\" and url \"%s\"", credentialsId, vaultUrl));
 
             VaultAccessor vaultAccessor = new VaultAccessor();
-            vaultAccessor.init(vaultUrl);
-
             VaultCredential credentials = CredentialsProvider.findCredentialById(credentialsId, VaultCredential.class, run);
-
-            if (credentials != null) {
-                vaultAccessor.auth(credentials);
-            }
+            vaultAccessor.init(vaultUrl, credentials);
             return vaultAccessor;
         }
 
         @Override
         public boolean start() throws Exception {
+            TaskListener listener = getContext().get(TaskListener.class);
             try {
                 EnvVars environment = getEnvironment();
-                VaultAccessor accessor = getAccessor(getContext().get(Run.class), getContext().get(TaskListener.class));
-                String value = accessor.read(Util.replaceMacro(step.path, environment)).getData().get(Util.replaceMacro(step.key, environment));
-                if (Boolean.TRUE.equals(this.renew)) {
-                    accessor.tokenRenew(this.renewHours);
+                VaultAccessor accessor = getAccessor(getContext().get(Run.class), listener);
+                String value = accessor.read(Util.replaceMacro(step.path, environment), 2).getData().get(Util.replaceMacro(step.key, environment));
+                if (Boolean.TRUE.equals(step.renew)) {
+                    accessor.renew(step.renewHours, listener.getLogger());
                 }
                 getContext().onSuccess(value);
             } catch (VaultPluginException e) {
-                getContext().onFailure(e);
+                if (step.printStacktrace) {
+                    getContext().onFailure(e);
+                } else {
+                    throw new AbortException(e.getMessage());
+                }
             }
             return true;
         }
